@@ -1,8 +1,7 @@
 var keepass = require('./keepass'),
 	path = require('path'),
 	spawn = require('child_process').spawn,
-	exec = require('child_process').exec,
-	notify = require('libnotify').notify;
+	exec = require('child_process').exec;
 
 function readPassword(result) {
 	require('tty').setRawMode(true);
