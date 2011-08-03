@@ -69,7 +69,7 @@ function main(args) {
 			f: function() {
 				var filter = args.shift().split(':', 2);
 				var filterName = filter[0];
-				var filterValue = filter[1];
+				var filterValue = filter[1].toLowerCase();
 				filters.push(function(e) {
 					if (e[filterName]) {
 						var value = e[filterName].apply(e);
