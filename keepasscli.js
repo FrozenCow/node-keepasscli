@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 var keepass = require('./keepass'),
 	path = require('path'),
 	spawn = require('child_process').spawn,
