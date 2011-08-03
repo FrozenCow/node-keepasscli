@@ -57,34 +57,6 @@ exports.userPassword = function(password) {
 	return crypto.SHA256(toBytes(password, 'utf8'), {asBytes: true});
 }
 
-function xorBytes(a, b) {
-	var r = [];
-	for(var i=0;i<a.length;i++) {
-		r.push(a[i] ^ (b ? b[i] : 0xff));
-	}
-	return r;
-}
-
-exports.decryptPassword = function(db, password) {
-	if (!password || !password['@'] || !password['#']) return undefined;
-	if (password['@'].Protected !== 'True') {
-		return password['#'];
-	}
-	var encryptedBytes = toBytes(password['#'], 'base64');
-	
-	var random = new Array(encryptedBytes.length);
-	for(var i=0;i<random.length;i++) {
-		random[i] = 0;
-	}
-	random = db.protectedStringDecrypter(random);
-	var decryptedBytes = xorBytes(encryptedBytes);
-	/*for(var i=0;i<decryptedBytes.length;i++) {
-		decryptedBytes[i] = decryptedBytes[i] ^ 0xff;
-	}*/
-	//console.log(decryptedBytes);
-	return new Buffer(decryptedBytes).toString('utf8');
-}
-
 exports.readDatabase = function(userKeys, filePath, result, error) {// try {
 	var databaseFile = (function openDatabaseFile(filePath) {
 		return {
@@ -144,27 +116,6 @@ exports.readDatabase = function(userKeys, filePath, result, error) {// try {
 		}
 		return header;
 	})(databaseFile);
-	
-	var randomStream = ({
-		0: function Null(key) { return function(data) { return data; } },
-		1: function ArcFourVariant(key) {
-			/*
-			for(uint w = 0; w < uRequestedCount; ++w)
-			{
-				++m_i;
-				m_j += m_pbState[m_i];
-
-				byte t = m_pbState[m_i]; // Swap entries
-				m_pbState[m_i] = m_pbState[m_j];
-				m_pbState[m_j] = t;
-
-				t = (byte)(m_pbState[m_i] + m_pbState[m_j]);
-				pbRet[w] = m_pbState[t];
-			}
-			*/
-			},
-		2: require('./salsa20').salsa20
-	}[header.randomStreamID])(crypto.SHA256(header.protectedStreamKey, {asBytes: true}));
 	
 	// Create key with which to decrypt the rest of the file.
 	var finalKey = (function fabricateDecryptionKey(userKeys) {
@@ -264,6 +215,28 @@ exports.readDatabase = function(userKeys, filePath, result, error) {// try {
 		0: function Uncompressed(input) { return new Buffer(input).toString('utf8'); },
 		1: function Gzip(input) { return require('./jsxcompressor').JXG.decompress(new Buffer(input).toString('base64')); }
 	}[header.compression])(content);
+	
+	// Random bytes generator for in-memory protection. Protected strings are xor-ed with random bytes from this generator.
+	var randomStream = ({
+		0: function Null(key) { return function(data) { return data; } },
+		1: function ArcFourVariant(key) {
+			/*
+			for(uint w = 0; w < uRequestedCount; ++w)
+			{
+				++m_i;
+				m_j += m_pbState[m_i];
+
+				byte t = m_pbState[m_i]; // Swap entries
+				m_pbState[m_i] = m_pbState[m_j];
+				m_pbState[m_j] = t;
+
+				t = (byte)(m_pbState[m_i] + m_pbState[m_j]);
+				pbRet[w] = m_pbState[t];
+			}
+			*/
+			},
+		2: require('./salsa20').salsa20
+	}[header.randomStreamID])(crypto.SHA256(header.protectedStreamKey, {asBytes: true}));
 	
 	(function parseXML(result) {
 		var parser = sax.parser(true);
