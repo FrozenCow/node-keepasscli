@@ -1,0 +1,8 @@
+{ "name": "keepasscli"
+, "version": "0.1"
+, "description": "Command-line tool for KeePass V2 database files."
+, "keywords": ["keepass","kdbx"]
+, "homepage": "http://softwarebakery.com/frozencow/"
+, "main": "./keepasscli.js"
+, "author": "FrozenCow <frozencow@gmail.com>"
+}
