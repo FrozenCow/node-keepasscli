@@ -182,37 +182,7 @@ function main(args) {
 	function end() {
 		
 	}
-	/*keepass.readDatabase(userKeys, databaseFile, handleDatabase, function(error) {
-		if (error instanceof Error) {
-			console.error(error.message);
-		} else if (typeof error === 'string') {
-			console.error(error);
-		} else {
-			console.error('Unknown error:', error);
-		}
-		process.exit(1);
-	});
-	
-	function handleDatabase(db) {
-		(function handlegroup(group) {
-			group.groups().forEach(handlegroup);
-			group.entries().forEach(handleentry);
-		})(db.root());
-		
-		function filter(entry) {
-			return filters.every(function(f) { return f(entry); });
-		}
-		
-		function handleentry(entry) {
-			if (filter(entry)) {
-				var leftoverActions = actions.slice(0);
-				function next() {
-					var action = leftoverActions.shift();
-					action(entry, next);
-				}
-			}
-		}
-	}*/
 }
 
+// Slice 'node keepasscli.js' from the actual arguments.
 main(process.argv.slice(2));
