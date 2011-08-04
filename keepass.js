@@ -3,7 +3,9 @@ var fs = require('fs'),
 	constants = require('constants'),
 	Struct = require('./struct.js').Struct,
 	crypto = require('./crypto.js').Crypto,
-	sax = require('sax');
+	sax = require('sax'),
+	salsa20 = require('./salsa20').salsa20,
+	JXG = require('./jsxcompressor').JXG;
 
 Buffer.prototype.toByteArray = function() { return Array.prototype.slice.call(this, 0) }
 
@@ -213,7 +215,7 @@ exports.readDatabase = function(userKeys, filePath, result, error) {// try {
 	// Uncompress the resulting bytes if the database is indeed marked (by db.compression) as compressed.
 	content = ({
 		0: function Uncompressed(input) { return new Buffer(input).toString('utf8'); },
-		1: function Gzip(input) { return require('./jsxcompressor').JXG.decompress(new Buffer(input).toString('base64')); }
+		1: function Gzip(input) { return JXG.decompress(new Buffer(input).toString('base64')); }
 	}[header.compression])(content);
 	
 	// Random bytes generator for in-memory protection. Protected strings are xor-ed with random bytes from this generator.
@@ -235,7 +237,7 @@ exports.readDatabase = function(userKeys, filePath, result, error) {// try {
 			}
 			*/
 			},
-		2: require('./salsa20').salsa20
+		2: salsa20
 	}[header.randomStreamID])(crypto.SHA256(header.protectedStreamKey, {asBytes: true}));
 	
 	(function parseXML(result) {
