@@ -144,7 +144,7 @@ function main(args) {
 	}
 	
 	function readDatabase() {
-		keepass.readDatabase(userKeys, databaseFile, handleDatabase, function(error) {
+		keepass.readDatabaseFromFile(userKeys, databaseFile, handleDatabase, function(error) {
 			if (error instanceof Error) {
 				console.error(error.message);
 			} else if (typeof error === 'string') {

@@ -45,6 +45,10 @@ function toBytes(i, encoding) {
 	}
 }
 
+function BufferToBytes(b) {
+	return Array.prototype.slice.call(b, 0);
+}
+
 function UTF8ToBytes(s) {
 	var bytes = [];
 	for(var i=0;i<s.length;i++) {
@@ -82,25 +86,25 @@ exports.readDatabaseFromFile = function(userKeys, filePath, result, error) {
 	if (fs.readSync(fd, buffer, 0, fileSize) < fileSize) {
 		throw new KeePassError("Could not read all bytes of file!");
 	}
-	var bytes = toBytes(b);
+	var bytes = BufferToBytes(buffer);
 	return exports.readDatabaseFromBytes(userKeys, bytes, result, error);
 };
 
-exports.readDatabaseFromBytes = function(userKeys, bytes, result, error) {// try {
+exports.readDatabaseFromBytes = function(userKeys, bytes, result, error) {
+	var filePosition = 0;
+	function readStruct(fmt) {
+		var l = Struct.CalcLength(fmt);
+		var r = Struct.Unpack(fmt, bytes, filePosition);
+		filePosition += l;
+		return r;
+	}
+	function readBytes(l) {
+		var r = bytes.slice(filePosition, filePosition+l);
+		filePosition += l;
+		return r;
+	}
+	
 	var header = (function readDatabaseHeader() {
-		var contentPosition = 0;
-		function readStruct(fmt) {
-			var l = Struct.CalcLength(fmt);
-			var r = Struct.Unpack(fmt, bytes, contentPosition);
-			contentPosition += l;
-			return r;
-		}
-		function readBytes(l) {
-			var r = bytes.slice(contentPosition, contentPosition+l);
-			contentPosition += l;
-			return r;
-		}
-		
 		var sigs = readStruct('<I<I');
 		if (sigs[0] !== 0x9AA2D903 ||
 			sigs[1] !== 0xB54BFB67) {
@@ -121,20 +125,20 @@ exports.readDatabaseFromBytes = function(userKeys, bytes, result, error) {// try
 			var fieldData = readBytes(fieldSize);
 			return ({
 				0: function EndOfHeader(b) { return true; },
-				1: function Comment(b) { header.comment = new Buffer(b).toString('utf8'); },
+				1: function Comment(b) { header.comment = BytesToUTF8(b); },
 				2: function CipherID(b) { header.dataCipher = b; },
-				3: function CompressionFlags(b) { header.compression = unpack('<I', b)[0]; },
+				3: function CompressionFlags(b) { header.compression = Struct.Unpack('<I', b)[0]; },
 				4: function MasterSeed(b) { header.masterSeed = b; },
 				5: function TransformSeed(b) { header.transformSeed = b; },
-				6: function TransformRounds(b) { header.transformRounds = unpack('<L', b)[0]; },
+				6: function TransformRounds(b) { header.transformRounds = Struct.Unpack('<L', b)[0]; },
 				7: function EncryptionIV(b) { header.encryptionIV = b; },
 				8: function ProtectedStreamKey(b) { header.protectedStreamKey = b; },
 				9: function StreamStartBytes(b) { header.streamStartBytes = b; },
-				10: function RandomStreamID(b) { header.randomStreamID = unpack('<I', b)[0]; }
+				10: function RandomStreamID(b) { header.randomStreamID = Struct.Unpack('<I', b)[0]; }
 			}[fieldID])(fieldData) || false;
 		}
 		return header;
-	})(databaseFile);
+	})();
 	
 	// Create key with which to decrypt the rest of the file.
 	var finalKey = (function fabricateDecryptionKey(userKeys) {
@@ -169,10 +173,8 @@ exports.readDatabaseFromBytes = function(userKeys, bytes, result, error) {// try
 	}[toHex(header.dataCipher)])(finalKey, header.encryptionIV);
 	
 	// Decrypt the rest of the file using the decrypter.
-	var content = (function ReadDecryptAndCheck(databaseFile, decrypter) {
-		var b = new Buffer(databaseFile.size);
-		var size = fs.readSync(databaseFile.fd, b, 0, databaseFile.size);
-		var bcrypted = Array.prototype.slice.apply(b, [0, size]);
+	var content = (function ReadDecryptAndCheck(decrypter) {
+		var bcrypted = readBytes(bytes.length - filePosition);
 		var bdecrypted = decrypter(bcrypted);
 		
 		startBytes = bdecrypted.slice(0, 32);
@@ -185,7 +187,7 @@ exports.readDatabaseFromBytes = function(userKeys, bytes, result, error) {// try
 		}
 		
 		return bdecrypted.slice(32);
-	})(databaseFile, decrypter);
+	})(decrypter);
 	
 	// Check every chunk of data with its preceding hash and concat all chunks to one byte array.
 	content = (function CheckAndConcatHashedBlocks(content) {
