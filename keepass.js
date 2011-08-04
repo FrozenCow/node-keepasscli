@@ -45,6 +45,22 @@ function toBytes(i, encoding) {
 	}
 }
 
+function UTF8ToBytes(s) {
+	var bytes = [];
+	for(var i=0;i<s.length;i++) {
+		bytes.push(s.charCodeAt(i));
+	}
+	return bytes;
+}
+
+function bytesToUTF8(bytes) {
+	var s = '';
+	for(var i=0;i<bytes.length;i++) {
+		s += String.fromCharCode(bytes[i]);
+	}
+	return s;
+}
+
 function dbg(i) {
 	// Disabled debugging.
 	//console.log.apply(console, Array.prototype.slice.apply(arguments, [0, arguments.length-1]).concat([toHex(arguments[arguments.length-1])]));
@@ -59,29 +75,30 @@ exports.userPassword = function(password) {
 	return crypto.SHA256(toBytes(password, 'utf8'), {asBytes: true});
 }
 
-exports.readDatabase = function(userKeys, filePath, result, error) {// try {
-	var databaseFile = (function openDatabaseFile(filePath) {
-		return {
-			size: fs.statSync(filePath).size,
-			fd: fs.openSync(filePath, 'r')
-		};
-	})(filePath);
+exports.readDatabaseFromFile = function(userKeys, filePath, result, error) {
+	var fd = fs.openSync(filePath, 'r');
+	var fileSize = fs.statSync(filePath).size;
+	var buffer = new Buffer(fileSize);
+	if (fs.readSync(fd, buffer, 0, fileSize) < fileSize) {
+		throw new KeePassError("Could not read all bytes of file!");
+	}
+	var bytes = toBytes(b);
+	return exports.readDatabaseFromBytes(userKeys, bytes, result, error);
+};
 
-	var header = (function readDatabaseHeader(databaseFile) {
-		function readBytes(l) {
-			var b = new Buffer(l);
-			if (fs.readSync(databaseFile.fd, b, 0, l) < l) {
-				throw new KeePassError("Could not read struct");
-			}
-			return toBytes(b);
-		}
-		function unpack(fmt, b) {
-			return Struct.Unpack(fmt, b);
-		}
+exports.readDatabaseFromBytes = function(userKeys, bytes, result, error) {// try {
+	var header = (function readDatabaseHeader() {
+		var contentPosition = 0;
 		function readStruct(fmt) {
 			var l = Struct.CalcLength(fmt);
-			var b = readBytes(l);
-			return unpack(fmt, b);
+			var r = Struct.Unpack(fmt, bytes, contentPosition);
+			contentPosition += l;
+			return r;
+		}
+		function readBytes(l) {
+			var r = bytes.slice(contentPosition, contentPosition+l);
+			contentPosition += l;
+			return r;
 		}
 		
 		var sigs = readStruct('<I<I');
