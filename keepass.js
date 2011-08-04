@@ -1,20 +1,10 @@
 var fs = require('fs'),
-	Buffer = require('buffer').Buffer,
 	constants = require('constants'),
 	Struct = require('./struct.js').Struct,
 	crypto = require('./crypto.js').Crypto,
 	sax = require('sax'),
 	salsa20 = require('./salsa20').salsa20,
 	JXG = require('./jsxcompressor').JXG;
-
-Buffer.prototype.toByteArray = function() { return Array.prototype.slice.call(this, 0) }
-
-Buffer.prototype.concat = function(b) {
-	var r = new Buffer(this.length + b.length);
-	this.copy(r, 0, 0);
-	b.copy(r, this.length, 0);
-	return r;
-}
 
 function toHex(a) {
 	if (a instanceof Array) {
@@ -31,20 +21,6 @@ function toHex(a) {
 	}
 }
 
-function toBytes(i, encoding) {
-	if (i instanceof Buffer) {
-		return Array.prototype.slice.call(i, 0);
-	} else if (typeof i === 'string' || i instanceof String) {
-		if (!encoding) { throw "Unsupported encoding"; }
-		return toBytes(new Buffer(i, encoding));
-	} else if (i instanceof Array) {
-		return i.slice(0);
-	} else {
-		console.error(typeof i);
-		throw "Unsupported type";
-	}
-}
-
 function BufferToBytes(b) {
 	return Array.prototype.slice.call(b, 0);
 }
@@ -57,7 +33,7 @@ function UTF8ToBytes(s) {
 	return bytes;
 }
 
-function bytesToUTF8(bytes) {
+function BytesToUTF8(bytes) {
 	var s = '';
 	for(var i=0;i<bytes.length;i++) {
 		s += String.fromCharCode(bytes[i]);
@@ -76,7 +52,7 @@ function KeePassError(message) {
 }
 
 exports.userPassword = function(password) {
-	return crypto.SHA256(toBytes(password, 'utf8'), {asBytes: true});
+	return crypto.SHA256(UTF8ToBytes(password), {asBytes: true});
 }
 
 exports.readDatabaseFromFile = function(userKeys, filePath, result, error) {
@@ -233,8 +209,8 @@ exports.readDatabaseFromBytes = function(userKeys, bytes, result, error) {
 	
 	// Uncompress the resulting bytes if the database is indeed marked (by db.compression) as compressed.
 	content = ({
-		0: function Uncompressed(input) { return new Buffer(input).toString('utf8'); },
-		1: function Gzip(input) { return JXG.decompress(new Buffer(input).toString('base64')); }
+		0: function Uncompressed(input) { return BytesToUTF8(input); },
+		1: function Gzip(input) { return new JXG.Util.Unzip(input).unzip()[0][0]; }
 	}[header.compression])(content);
 	
 	// Random bytes generator for in-memory protection. Protected strings are xor-ed with random bytes from this generator.
@@ -296,14 +272,14 @@ exports.readDatabaseFromBytes = function(userKeys, bytes, result, error) {
 					var value = function() { return e.xml.children.filter(function(e) { return e.xml.name === 'Value' }).map(function(e) { return e.xml._text})[0]; };
 					if (key && value()) {
 						if (isprotected) {
-							var cryptedBytesLength = new Buffer(value(), 'base64').length;
+							var cryptedBytesLength = JXG.Util.Base64.decode(value()).length;
 							var randomBytes = randomStream(cryptedBytesLength);
 							e.xml.parent[key] = function() {
-								var bytes = new Buffer(value(), 'base64');
+								var bytes = UTF8ToBytes(JXG.Util.Base64.decode(value()));
 								for (var i=0;i<bytes.length; i++) {
 									bytes[i] = bytes[i] ^ randomBytes[i];
 								}
-								return bytes.toString('utf8');
+								return BytesToUTF8(bytes);
 							};
 						} else {
 							e.xml.parent[key] = value;
