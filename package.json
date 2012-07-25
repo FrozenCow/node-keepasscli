@@ -1,8 +1,13 @@
 { "name": "keepasscli"
-, "version": "0.1"
+, "version": "0.0.1"
 , "description": "Command-line tool for KeePass V2 database files."
 , "keywords": ["keepass","kdbx"]
 , "homepage": "http://softwarebakery.com/frozencow/"
 , "main": "./keepasscli.js"
 , "author": "FrozenCow <frozencow@gmail.com>"
+, "dependencies":
+	{ "sax": ">= 0.2.2"
+	, "pack": ">= 0.2.7"
+	, "xml2js": ">= 0.1.9"
+	}
 }
